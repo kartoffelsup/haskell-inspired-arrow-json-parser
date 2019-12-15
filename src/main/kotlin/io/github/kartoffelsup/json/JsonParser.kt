@@ -92,10 +92,13 @@ fun jsonString(): Parser<JsonValue> = ParserAlternativeInstance.run {
 fun whiteSpace(): Parser<String> = spanParser { it.isWhitespace() }
 
 fun <A, B> sepBy(sep: Parser<A>, element: Parser<B>): Parser<List<B>> = ParserAlternativeInstance.run {
-    val rightWins: Parser<B> = sep.rightWins(element)
-    val many: Parser<SequenceK<B>> = rightWins.many().fix()
-    val result: Parser<SequenceK<B>> = (many alt just(emptySequence<B>().k())).fix()
-    return result.map { it.toList() }
+    val elementAsSeq: Parser<SequenceK<B>> = element.map { sequenceOf(it).k() }
+    val rw: Parser<SequenceK<B>> = sep.rightWins(element).many().fix()
+
+    val cons: Parser<(SequenceK<B>) -> SequenceK<B>> = elementAsSeq.map { a: SequenceK<B> -> { b: SequenceK<B> -> (a + b).k() } }
+    val result: Parser<SequenceK<B>> = rw.ap(cons).fix()
+    val just: Parser<SequenceK<B>> = just(emptySequence<B>().k()).fix()
+    (result alt just).map { it.toList() }.fix()
 }
 
 fun jsonArray(): Parser<JsonValue> = ParserAlternativeInstance.run {
@@ -111,23 +114,17 @@ fun jsonValue(): Parser<JsonValue> = ParserAlternativeInstance.run {
 }.fix()
 
 fun main() {
-    println(stringParser("hello").runParser("hellothere"))
-    println(jsonBool().runParser("true"))
-    println(jsonBool().runParser("false"))
-    println(jsonNumber().runParser(""))
-    println(jsonString().runParser("\"testing\""))
-    println(jsonNull().runParser("nullnull"))
-    ParserAlternativeInstance.run {
-        val fix: Parser<List<JsonValue>> = jsonNull().many().fix().map { it.toList() }
-        val message = fix.runParser("nullnullnull")
-        println(message)
-    }
-//
-//    ParserAlternativeInstance.run {
-//        println((charParser('[').rightWins(sepBy(whiteSpace(), stringLiteral()))).leftWins(charParser(']')).runParser("[ \"hello\" \"bye\"]"))
-//    }
-//
-//    // TODO stackoverflows :(
+//    println(stringParser("hello").runParser("hellothere"))
+//    println(jsonBool().runParser("true"))
+//    println(jsonBool().runParser("false"))
+//    println(jsonNumber().runParser(""))
+//    println(jsonString().runParser("\"testing\""))
+//    println(jsonNull().runParser("nullnull"))
+
+    println(sepBy(charParser(','), charParser('a')).runParser("a,a,a,a"))
+    println(sepBy(charParser(','), charParser('a')).runParser(""))
+
+    // TODO stackoverflows :(
 //    println(jsonArray().runParser("[]"))
 //    println(jsonArray().runParser("[1, \"asdf\", true, null]"))
 }
