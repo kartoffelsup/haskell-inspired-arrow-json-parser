@@ -1,0 +1,82 @@
+package io.github.kartoffelsup.json
+
+import arrow.Kind
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.SequenceK
+import arrow.core.Some
+import arrow.core.Tuple2
+import arrow.core.curry
+import arrow.core.extensions.option.alternative.alt
+import arrow.core.k
+import arrow.typeclasses.Alternative
+import arrow.typeclasses.Applicative
+import arrow.typeclasses.Functor
+
+infix fun <A> Kind<ForParser, A>.alt(arg1: Kind<ForParser, A>): Parser<A> =
+    ParserAlternativeInstance.run {
+        this@alt.alt(arg1).fix()
+    }
+
+interface ParserFunctor : Functor<ForParser> {
+    override fun <A, B> ParserOf<A>.map(f: (A) -> B) = fix().map(f)
+
+}
+
+interface ParserApplicative : Applicative<ForParser> {
+    override fun <A> just(a: A): Parser<A> = Parser { input ->
+        Some(Tuple2(input, a))
+    }
+
+    override fun <A, B> ParserOf<A>.ap(ff: ParserOf<(A) -> B>) = fix().ap(ff)
+}
+
+interface ParserAlternative : Alternative<ForParser> {
+    override fun <A> empty(): Parser<A> = Parser { None }
+
+    override fun <A, B> ParserOf<A>.ap(ff: ParserOf<(A) -> B>): Parser<B> = fix().ap(ff)
+
+    override fun <A> just(a: A): Kind<ForParser, A> = Parser.just(a)
+
+    override fun <A> Kind<ForParser, A>.many(): Parser<SequenceK<A>> = Parser { input ->
+        val parserA: Parser<A> = this.fix()
+        val runParser: Option<Tuple2<String, A>> = parserA.runParser(input)
+        runParser.map { p: Tuple2<String, A> ->
+            var tmp = runParser
+            val seq = Sequence {
+                object : Iterator<A> {
+                    override fun hasNext(): Boolean {
+                        return tmp.fold({ false }, { true })
+                    }
+
+                    override fun next(): A {
+                        return tmp.fold({ TODO() }, {
+                            tmp = parserA.runParser(it.a)
+                            it.b
+                        })
+                    }
+                }
+            }.k()
+
+            //  FIXME p.a is wrong. We need the remainder of the end of the sequence here...
+            Tuple2(p.a, seq)
+        }
+    }
+
+    override fun <A> Kind<ForParser, A>.orElse(b: Kind<ForParser, A>): Kind<ForParser, A> = Parser { input ->
+        val left: Option<Tuple2<String, A>> = fix().runParser(input)
+        left alt b.fix().runParser(input)
+    }
+
+    fun <A, B, C> Kind<ForParser, A>.liftA2(a: Kind<ForParser, A>, b: Kind<ForParser, B>, f: (A, B) -> C): Parser<C> {
+        return b.ap(a.fix().map(f.curry())).fix()
+    }
+
+    fun <A, B> Kind<ForParser, A>.leftWins(right: Kind<ForParser, B>): Parser<A> = liftA2(this, right) { a, _ -> a }
+
+    fun <A, B> Kind<ForParser, A>.rightWins(right: Kind<ForParser, B>): Parser<B> = liftA2(this, right) { _, b -> b }
+}
+
+object ParserFunctorInstance : ParserFunctor
+object ParserApplicativeInstance : ParserApplicative
+object ParserAlternativeInstance : ParserAlternative
