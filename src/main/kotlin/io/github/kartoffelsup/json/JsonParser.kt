@@ -16,6 +16,7 @@ import arrow.core.k
 // typealias Parser<T> = (String) -> Option<Tuple2<String, T>>
 
 interface Parser<out A> : ParserOf<A> {
+    // TODO: no proper error reporting
     val runParser: (String) -> Option<Tuple2<String, A>>
 
     fun <B> map(f: (A) -> B): Parser<B> =
@@ -83,7 +84,7 @@ fun jsonBool(): Parser<JsonValue> = ParserAlternativeInstance.run {
 
 fun jsonNumber(): Parser<JsonValue> = spanParser(Char::isDigit).map { JsonNumber(it.toInt()) }
 
-// TODO: escaping
+// TODO: no escape support
 fun stringLiteral(): Parser<String> = spanParser { it != '"' }
 
 fun jsonString(): Parser<JsonValue> = ParserAlternativeInstance.run {
