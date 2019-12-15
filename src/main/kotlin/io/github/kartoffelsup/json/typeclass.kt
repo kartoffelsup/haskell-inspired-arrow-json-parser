@@ -7,17 +7,12 @@ import arrow.core.SequenceK
 import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.core.curry
-import arrow.core.extensions.option.alternative.alt
 import arrow.core.k
+import arrow.core.orElse
 import arrow.core.toT
 import arrow.typeclasses.Alternative
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
-
-infix fun <A> Kind<ForParser, A>.alt(arg1: Kind<ForParser, A>): Parser<A> =
-    ParserAlternativeInstance.run {
-        this@alt.alt(arg1).fix()
-    }
 
 interface ParserFunctor : Functor<ForParser> {
     override fun <A, B> ParserOf<A>.map(f: (A) -> B) = fix().map(f)
@@ -48,7 +43,7 @@ interface ParserAlternative : Alternative<ForParser> {
                 val some: Option<Tuple2<String, SequenceK<A>>> = Some(tuple2)
                 some
             }, ifSome = { (r: String, a: A) ->
-                many().runParser(r).fold({ None }, { (r2: String, xs: SequenceK<A>) ->
+                many().runParser(r).fold({ Some(r toT sequenceOf(a).k()) }, { (r2: String, xs: SequenceK<A>) ->
                     val tuple: Tuple2<String, SequenceK<A>> = r2 toT (sequenceOf(a) + xs).k()
                     Some(tuple)
                 }
