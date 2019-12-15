@@ -52,8 +52,9 @@ interface ParserAlternative : Alternative<ForParser> {
     }
 
     override fun <A> Kind<ForParser, A>.orElse(b: Kind<ForParser, A>): Kind<ForParser, A> = Parser { input ->
-        val left: Option<Tuple2<String, A>> = fix().runParser(input)
-        left alt b.fix().runParser(input)
+        this.fix().runParser(input).orElse {
+            b.fix().runParser(input)
+        }
     }
 
     fun <A, B, C> Kind<ForParser, A>.liftA2(a: Kind<ForParser, A>, b: Kind<ForParser, B>, f: (A, B) -> C): Parser<C> {

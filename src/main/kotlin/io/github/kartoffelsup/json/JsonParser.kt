@@ -1,7 +1,7 @@
 package io.github.kartoffelsup.json
 
 import arrow.Kind
-import arrow.core.ListK
+import arrow.core.ForListK
 import arrow.core.NonEmptyList
 import arrow.core.None
 import arrow.core.Option
@@ -9,6 +9,8 @@ import arrow.core.SequenceK
 import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.core.extensions.fx
+import arrow.core.extensions.list.traverse.sequence
+import arrow.core.fix
 import arrow.core.k
 
 // typealias Parser<T> = (String) -> Option<Tuple2<String, T>>
@@ -50,11 +52,11 @@ private fun charParser(char: Char): Parser<Char> =
     }
 
 private fun stringParser(string: String): Parser<String> {
-    val traverse: Kind<ForParser, ListK<Char>> =
-        string.toList().map(::charParser).k().traverse(ParserApplicativeInstance) { it }
-    return traverse.fix().map {
-        it.s()
-    }
+    val parser: Parser<Kind<ForListK, Char>> = string.toList()
+        .map(::charParser).k()
+        .sequence(ParserApplicativeInstance).fix()
+
+    return parser.map { it.fix().s() }
 }
 
 private fun spanParser(p: (Char) -> Boolean): Parser<String> = Parser { input ->
@@ -95,7 +97,8 @@ fun <A, B> sepBy(sep: Parser<A>, element: Parser<B>): Parser<List<B>> = ParserAl
     val elementAsSeq: Parser<SequenceK<B>> = element.map { sequenceOf(it).k() }
     val rw: Parser<SequenceK<B>> = sep.rightWins(element).many().fix()
 
-    val cons: Parser<(SequenceK<B>) -> SequenceK<B>> = elementAsSeq.map { a: SequenceK<B> -> { b: SequenceK<B> -> (a + b).k() } }
+    val cons: Parser<(SequenceK<B>) -> SequenceK<B>> =
+        elementAsSeq.map { a: SequenceK<B> -> { b: SequenceK<B> -> (a + b).k() } }
     val result: Parser<SequenceK<B>> = rw.ap(cons).fix()
     val just: Parser<SequenceK<B>> = just(emptySequence<B>().k()).fix()
     (result alt just).map { it.toList() }.fix()
@@ -109,9 +112,11 @@ fun jsonArray(): Parser<JsonValue> = ParserAlternativeInstance.run {
     result.map { JsonArray(it) }
 }
 
-fun jsonValue(): Parser<JsonValue> = ParserAlternativeInstance.run {
-    jsonNull() alt jsonBool() alt jsonNumber() alt jsonString() alt jsonArray()
-}.fix()
+fun jsonValue(): Parser<JsonValue> =
+    ParserAlternativeInstance.run {
+        jsonNull() alt jsonBool() alt jsonNumber() alt jsonString() alt jsonArray()
+    }.fix()
+
 
 fun main() {
 //    println(stringParser("hello").runParser("hellothere"))
@@ -120,11 +125,12 @@ fun main() {
 //    println(jsonNumber().runParser(""))
 //    println(jsonString().runParser("\"testing\""))
 //    println(jsonNull().runParser("nullnull"))
-
-    println(sepBy(charParser(','), charParser('a')).runParser("a,a,a,a"))
-    println(sepBy(charParser(','), charParser('a')).runParser(""))
+//
+//    println(sepBy(charParser(','), charParser('a')).runParser("a,a,a,a"))
+//    println(sepBy(charParser(','), charParser('a')).runParser(""))
 
     // TODO stackoverflows :(
+    println(jsonValue().runParser("false"))
 //    println(jsonArray().runParser("[]"))
 //    println(jsonArray().runParser("[1, \"asdf\", true, null]"))
 }
