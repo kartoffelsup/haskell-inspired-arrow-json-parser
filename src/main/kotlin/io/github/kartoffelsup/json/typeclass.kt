@@ -9,6 +9,7 @@ import arrow.core.Tuple2
 import arrow.core.curry
 import arrow.core.extensions.option.alternative.alt
 import arrow.core.k
+import arrow.core.toT
 import arrow.typeclasses.Alternative
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
@@ -38,29 +39,21 @@ interface ParserAlternative : Alternative<ForParser> {
 
     override fun <A> just(a: A): Kind<ForParser, A> = Parser.just(a)
 
-    override fun <A> Kind<ForParser, A>.many(): Parser<SequenceK<A>> = Parser { input ->
+    override fun <A> Kind<ForParser, A>.many(): Parser<SequenceK<A>> = Parser { input: String ->
         val parserA: Parser<A> = this.fix()
         val runParser: Option<Tuple2<String, A>> = parserA.runParser(input)
-        runParser.map { p: Tuple2<String, A> ->
-            var tmp = runParser
-            val seq = Sequence {
-                object : Iterator<A> {
-                    override fun hasNext(): Boolean {
-                        return tmp.fold({ false }, { true })
-                    }
-
-                    override fun next(): A {
-                        return tmp.fold({ TODO() }, {
-                            tmp = parserA.runParser(it.a)
-                            it.b
-                        })
-                    }
+        runParser.fold(
+            ifEmpty = {
+                val tuple2: Tuple2<String, SequenceK<A>> = input toT emptySequence<A>().k()
+                val some: Option<Tuple2<String, SequenceK<A>>> = Some(tuple2)
+                some
+            }, ifSome = { (r: String, a: A) ->
+                many().runParser(r).fold({ None }, { (r2: String, xs: SequenceK<A>) ->
+                    val tuple: Tuple2<String, SequenceK<A>> = r2 toT (sequenceOf(a) + xs).k()
+                    Some(tuple)
                 }
-            }.k()
-
-            //  FIXME p.a is wrong. We need the remainder of the end of the sequence here...
-            Tuple2(p.a, seq)
-        }
+                )
+            })
     }
 
     override fun <A> Kind<ForParser, A>.orElse(b: Kind<ForParser, A>): Kind<ForParser, A> = Parser { input ->
