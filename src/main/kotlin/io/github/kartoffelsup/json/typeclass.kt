@@ -42,12 +42,12 @@ interface ParserAlternative : Alternative<ForParser> {
                 val tuple2: Tuple2<String, SequenceK<A>> = input toT emptySequence<A>().k()
                 val some: Option<Tuple2<String, SequenceK<A>>> = Some(tuple2)
                 some
-            }, ifSome = { (r: String, a: A) ->
+            },
+            ifSome = { (r: String, a: A) ->
                 many().runParser(r).fold({ Some(r toT sequenceOf(a).k()) }, { (r2: String, xs: SequenceK<A>) ->
                     val tuple: Tuple2<String, SequenceK<A>> = r2 toT (sequenceOf(a) + xs).k()
                     Some(tuple)
-                }
-                )
+                })
             })
     }
 

@@ -63,27 +63,28 @@ private fun stringParser(string: String): Parser<String> {
 
 private fun spanParser(p: (Char) -> Boolean): Parser<String> = Parser { input ->
     val (xs, input2) = input.toList().k().partition(p)
-    if (xs.isEmpty()) {
-        None
-    } else {
-        Some(input2.s() toT xs.s())
-    }
+    Some(input2.s() toT xs.s())
 }
 
 fun jsonNull(): Parser<JsonValue> =
     stringParser("null").map { JsonNull }
 
 fun jsonBool(): Parser<JsonValue> = ParserAlternativeInstance.run {
-    stringParser("true") alt stringParser("false")
-}.fix().map { f: String ->
-    when (f) {
-        "true" -> JsonBool(true)
-        "false" -> JsonBool(false)
-        else -> TODO("this should never happen ;)")
+    stringParser("true").map { JsonBool(true) } alt stringParser("false").map { JsonBool(false) }
+}.fix()
+
+fun notEmpty(p: Parser<String>): Parser<String> = Parser { input ->
+    val runParser = p.runParser(input)
+    runParser.flatMap { tuple ->
+        if (tuple.b.isEmpty()) {
+            None
+        } else {
+            Some(tuple)
+        }
     }
 }
 
-fun jsonNumber(): Parser<JsonValue> = spanParser(Char::isDigit).map { JsonNumber(it.toInt()) }
+fun jsonNumber(): Parser<JsonValue> = notEmpty(spanParser(Char::isDigit)).map { JsonNumber(it.toInt()) }
 
 // TODO: no escape support
 fun stringLiteral(): Parser<String> = ParserAlternativeInstance.run {
@@ -96,6 +97,7 @@ fun jsonString(): Parser<JsonValue> = ParserAlternativeInstance.run {
 
 fun whiteSpace(): Parser<String> = spanParser { it.isWhitespace() }
 
+// TODO Fix this
 fun <A, B> sepBy(sep: Parser<A>, element: Parser<B>): Parser<List<B>> = ParserAlternativeInstance.run {
     val elementAsSeq: Parser<SequenceK<B>> = element.map { sequenceOf(it).k() }
     val rw: Parser<SequenceK<B>> = sep.rightWins(element).many().fix()
@@ -116,10 +118,11 @@ fun jsonArray(): Parser<JsonValue> = ParserAlternativeInstance.run {
     result.map { JsonArray(it) }
 }
 
-fun jsonValue(): Parser<JsonValue> =
+fun jsonValue(): Parser<JsonValue> = Parser { input ->
     ParserAlternativeInstance.run {
         jsonNull() alt jsonBool() alt jsonNumber() alt jsonString() alt jsonArray()
-    }.fix()
+    }.fix().runParser(input)
+}
 
 fun main() {
 //    println(stringParser("hello").runParser("hellothere"))
@@ -129,16 +132,25 @@ fun main() {
 //    println(jsonString().runParser("\"testing\""))
 //    println(jsonNull().runParser("nullnull"))
 //
-//    println(sepBy(charParser(','), charParser('a')).runParser("a,a,a,a"))
+    println(sepBy(charParser(','), charParser('a')).runParser("a,a,a,a"))
 //    println(sepBy(charParser(','), charParser('a')).runParser(""))
-    println(jsonString().runParser("\"hi\""))
-    val f: Option<Tuple2<String, List<JsonValue>>> =
-        sepBy(charParser(','), jsonString()).runParser("\"hi\",\"bye\",\"geil\",\"scheisse\"")
-    println(f)
-    println(sepBy(charParser(','), charParser('a')).runParser("a,a,a,a,a,a"))
-
-    // TODO stackoverflows :(
+//    println(jsonString().runParser("\"hi\""))
+//    val f: Option<Tuple2<String, List<JsonValue>>> =
+//        sepBy(charParser(','), jsonString()).runParser("\"hi\",\"bye\",\"geil\",\"scheisse\"")
+//    println(f)
+//    val result: Option<Tuple2<String, List<Char>>> = sepBy(charParser(','), charParser('a')).runParser("a,a,a,a,a,a")
+//    check(
+//        result.map { it.b }.fold({ false }) { b: List<Char> -> b == listOf('a', 'a', 'a', 'a', 'a', 'a') }
+//    ) {
+//        "Expecting $result to have value  ${listOf('a', 'a', 'a', 'a', 'a', 'a')}"
+//    }
+//
 //    println(jsonValue().runParser("false"))
+//    println(jsonValue().runParser("\"asdf\""))
+//    println(jsonValue().runParser("true"))
+//    println(jsonValue().runParser("null"))
+//    val separator = whiteSpace().rightWins(charParser(',')).leftWins(whiteSpace())
+//    println(separator.runParser(", , "))
 //    println(jsonArray().runParser("[]"))
-//    println(jsonArray().runParser("[1, \"asdf\", true, null]"))
+    println(jsonArray().runParser("""["asdf"]"""))
 }
