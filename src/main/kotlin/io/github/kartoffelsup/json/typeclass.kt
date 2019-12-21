@@ -56,14 +56,6 @@ interface ParserAlternative : Alternative<ForParser> {
             b.fix().runParser(input)
         }
     }
-
-    fun <A, B, C> Kind<ForParser, A>.liftA2(a: Kind<ForParser, A>, b: Kind<ForParser, B>, f: (A, B) -> C): Parser<C> {
-        return b.ap(a.fix().map(f.curry())).fix()
-    }
-
-    fun <A, B> Kind<ForParser, A>.leftWins(right: Kind<ForParser, B>): Parser<A> = liftA2(this, right) { a, _ -> a }
-
-    fun <A, B> Kind<ForParser, A>.rightWins(right: Kind<ForParser, B>): Parser<B> = liftA2(this, right) { _, b -> b }
 }
 
 object ParserFunctorInstance : ParserFunctor

@@ -9,7 +9,7 @@ repositories {
 }
 
 dependencies {
-    val arrowVersion = "0.10.3"
+    val arrowVersion = "0.10.4"
     implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("io.arrow-kt:arrow-core:$arrowVersion")
