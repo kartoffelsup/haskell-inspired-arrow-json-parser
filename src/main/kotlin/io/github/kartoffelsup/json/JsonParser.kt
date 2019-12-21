@@ -12,9 +12,8 @@ import arrow.core.extensions.fx
 import arrow.core.extensions.list.traverse.sequence
 import arrow.core.fix
 import arrow.core.k
+import arrow.core.toMap
 import arrow.core.toT
-import io.github.kartoffelsup.json.ParserAlternativeInstance.leftWins
-import io.github.kartoffelsup.json.ParserAlternativeInstance.rightWins
 
 // typealias Parser<T> = (String) -> Option<Tuple2<String, T>>
 
@@ -120,19 +119,24 @@ fun jsonArray(): Parser<JsonValue> = ParserAlternativeInstance.run {
     result.map { JsonArray(it) }
 }
 
-fun jsonValue(): Parser<JsonValue> = Parser { input ->
-    ParserAlternativeInstance.run {
-        jsonNull() alt jsonBool() alt jsonNumber() alt jsonString() alt jsonArray()
-    }.fix().runParser(input)
+fun jsonObject(): Parser<JsonValue> = ParserAlternativeInstance.run {
+    val prefix = charParser('{').leftWins(whiteSpace())
+    val suffix = whiteSpace().rightWins(charParser('}'))
+    val objectSeparator = whiteSpace().rightWins(charParser(',')).leftWins(whiteSpace())
+    val keyValueSeparator: Parser<Char> = whiteSpace().rightWins(charParser(':')).leftWins(whiteSpace())
+    val combineIntoObject: (String, Char, JsonValue) -> Tuple2<String, JsonValue> = { key, _, value -> key toT value }
+
+    val map: Parser<(Char) -> (JsonValue) -> Tuple2<String, JsonValue>> =
+        stringLiteral().map { s: String -> { c: Char -> { v: JsonValue -> combineIntoObject(s, c, v) } } }
+
+    val pair: Parser<Tuple2<String, JsonValue>> = jsonValue().ap(keyValueSeparator.ap(map))
+
+    prefix.rightWins(sepBy(objectSeparator, pair)).leftWins(suffix)
+        .map { JsonObject(it.toMap()) }
 }
 
-fun main() {
-    println(jsonNumber().runParser("1"))
-    println(jsonString().runParser("\"asdf\""))
-    println(jsonArray().runParser("[]"))
-    println(jsonArray().runParser("[1]"))
-    println(jsonArray().runParser("[true]"))
-    println(jsonArray().runParser("[null]"))
-    println(jsonArray().runParser("[1, 2, 3, 4, true, \"asdf\", null, false, [1,2,3]]"))
-    println(jsonArray().runParser("""["asdf"]"""))
+fun jsonValue(): Parser<JsonValue> = Parser { input ->
+    ParserAlternativeInstance.run {
+        jsonNull() alt jsonBool() alt jsonNumber() alt jsonString() alt jsonArray() alt jsonObject()
+    }.fix().runParser(input)
 }
