@@ -98,7 +98,6 @@ fun jsonString(): Parser<JsonValue> = ParserAlternativeInstance.run {
 
 fun whiteSpace(): Parser<String> = spanParser { it.isWhitespace() }
 
-// TODO Fix this
 fun <A, B> sepBy(sep: Parser<A>, element: Parser<B>): Parser<List<B>> = ParserAlternativeInstance.run {
     val elementAsSeq: Parser<SequenceK<B>> = element.map { sequenceOf(it).k() }
     val rw: Parser<SequenceK<B>> = sep.followedBy(element).many().fix()
