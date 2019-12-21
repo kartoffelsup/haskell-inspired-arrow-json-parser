@@ -13,6 +13,8 @@ import arrow.core.extensions.list.traverse.sequence
 import arrow.core.fix
 import arrow.core.k
 import arrow.core.toT
+import io.github.kartoffelsup.json.ParserAlternativeInstance.leftWins
+import io.github.kartoffelsup.json.ParserAlternativeInstance.rightWins
 
 // typealias Parser<T> = (String) -> Option<Tuple2<String, T>>
 
@@ -62,7 +64,7 @@ private fun stringParser(string: String): Parser<String> {
 }
 
 private fun spanParser(p: (Char) -> Boolean): Parser<String> = Parser { input ->
-    val (xs, input2) = input.toList().k().partition(p)
+    val (xs, input2) = input.toList().span(p)
     Some(input2.s() toT xs.s())
 }
 
@@ -125,32 +127,12 @@ fun jsonValue(): Parser<JsonValue> = Parser { input ->
 }
 
 fun main() {
-//    println(stringParser("hello").runParser("hellothere"))
-//    println(jsonBool().runParser("true"))
-//    println(jsonBool().runParser("false"))
-//    println(jsonNumber().runParser(""))
-//    println(jsonString().runParser("\"testing\""))
-//    println(jsonNull().runParser("nullnull"))
-//
-    println(sepBy(charParser(','), charParser('a')).runParser("a,a,a,a"))
-//    println(sepBy(charParser(','), charParser('a')).runParser(""))
-//    println(jsonString().runParser("\"hi\""))
-//    val f: Option<Tuple2<String, List<JsonValue>>> =
-//        sepBy(charParser(','), jsonString()).runParser("\"hi\",\"bye\",\"geil\",\"scheisse\"")
-//    println(f)
-//    val result: Option<Tuple2<String, List<Char>>> = sepBy(charParser(','), charParser('a')).runParser("a,a,a,a,a,a")
-//    check(
-//        result.map { it.b }.fold({ false }) { b: List<Char> -> b == listOf('a', 'a', 'a', 'a', 'a', 'a') }
-//    ) {
-//        "Expecting $result to have value  ${listOf('a', 'a', 'a', 'a', 'a', 'a')}"
-//    }
-//
-//    println(jsonValue().runParser("false"))
-//    println(jsonValue().runParser("\"asdf\""))
-//    println(jsonValue().runParser("true"))
-//    println(jsonValue().runParser("null"))
-//    val separator = whiteSpace().rightWins(charParser(',')).leftWins(whiteSpace())
-//    println(separator.runParser(", , "))
-//    println(jsonArray().runParser("[]"))
+    println(jsonNumber().runParser("1"))
+    println(jsonString().runParser("\"asdf\""))
+    println(jsonArray().runParser("[]"))
+    println(jsonArray().runParser("[1]"))
+    println(jsonArray().runParser("[true]"))
+    println(jsonArray().runParser("[null]"))
+    println(jsonArray().runParser("[1, 2, 3, 4, true, \"asdf\", null, false, [1,2,3]]"))
     println(jsonArray().runParser("""["asdf"]"""))
 }
