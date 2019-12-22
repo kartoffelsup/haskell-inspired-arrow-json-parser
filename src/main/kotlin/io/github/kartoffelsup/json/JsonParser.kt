@@ -14,39 +14,44 @@ import arrow.core.k
 import arrow.core.toMap
 import arrow.core.toOption
 import arrow.core.toT
+import kotlin.time.ExperimentalTime
+import kotlin.time.TimedValue
+import kotlin.time.measureTimedValue
 
 interface Parser<out A> : ParserOf<A> {
     // TODO: no proper error reporting
-    val runParser: (String) -> Option<Tuple2<String, A>>
+    val runParser: (StringView) -> Option<Tuple2<StringView, A>>
 
     fun <B> map(f: (A) -> B): Parser<B> =
-        Parser { x: String ->
-            runParser(x).map { t ->
+        Parser { input: StringView ->
+            runParser(input).map { t ->
                 t.map(f)
             }
         }
 
     fun <B> ap(ff: ParserOf<(A) -> B>): Parser<B> = Parser { input ->
         Option.fx {
-            val (input2: String, f: (A) -> B) = ff.fix().runParser(input).bind()
-            val (input3: String, g: A) = fix().runParser(input2).bind()
+            val (input2: StringView, f: (A) -> B) = ff.fix().runParser(input).bind()
+            val (input3: StringView, g: A) = fix().runParser(input2).bind()
             Tuple2(input3, f(g))
         }
     }
 
     companion object {
-        operator fun <T> invoke(parser: (String) -> Option<Tuple2<String, T>>): Parser<T> = ParserInstance(parser)
+        operator fun <T> invoke(parser: (StringView) -> Option<Tuple2<StringView, T>>): Parser<T> =
+            ParserInstance(parser)
 
         fun <A> just(a: A): Parser<A> = Parser { input ->
             Some(Tuple2(input, a))
         }
 
-        private data class ParserInstance<A>(override val runParser: (String) -> Option<Tuple2<String, A>>) : Parser<A>
+        private data class ParserInstance<A>(
+            override val runParser: (StringView) -> Option<Tuple2<StringView, A>>) : Parser<A>
     }
 }
 
 private fun charParser(char: Char): Parser<Char> =
-    Parser { input: String ->
+    Parser { input: StringView ->
         input
             .takeIf { it.isNotEmpty() && it[0] == char }
             .toOption()
@@ -61,7 +66,7 @@ private fun stringParser(string: String): Parser<String> {
     return parser.map { it.fix().s() }
 }
 
-private fun spanParser(p: (Char) -> Boolean): Parser<String> = Parser { input ->
+private fun spanParser(p: (Char) -> Boolean): Parser<StringView> = Parser { input ->
     val (xs, input2) = input.span(p)
     Some(input2 toT xs)
 }
@@ -73,7 +78,7 @@ fun jsonBool(): Parser<JsonValue> = ParserAlternativeInstance.run {
     stringParser("true").map { JsonBool(true) } alt stringParser("false").map { JsonBool(false) }
 }.fix()
 
-fun notEmpty(p: Parser<String>): Parser<String> = Parser { input ->
+fun notEmpty(p: Parser<StringView>): Parser<StringView> = Parser { input ->
     val runParser = p.runParser(input)
     runParser.flatMap { tuple ->
         if (tuple.b.isEmpty()) {
@@ -84,18 +89,18 @@ fun notEmpty(p: Parser<String>): Parser<String> = Parser { input ->
     }
 }
 
-fun jsonNumber(): Parser<JsonValue> = notEmpty(spanParser(Char::isDigit)).map { JsonNumber(it.toInt()) }
+fun jsonNumber(): Parser<JsonValue> = notEmpty(spanParser(Char::isDigit)).map { JsonNumber(it.value.toInt()) }
 
 // TODO: no escape support
-fun stringLiteral(): Parser<String> = ParserAlternativeInstance.run {
+fun stringLiteral(): Parser<StringView> = ParserAlternativeInstance.run {
     charParser('"').followedBy(spanParser { it != '"' }.apTap(charParser('"'))).fix()
 }
 
 fun jsonString(): Parser<JsonValue> = ParserAlternativeInstance.run {
-    stringLiteral().map { JsonString(it) }
+    stringLiteral().map { JsonString(it.value) }
 }
 
-fun whiteSpace(): Parser<String> = spanParser { it.isWhitespace() }
+fun whiteSpace(): Parser<StringView> = spanParser { it.isWhitespace() }
 
 fun <A, B> sepBy(sep: Parser<A>, element: Parser<B>): Parser<List<B>> = ParserAlternativeInstance.run {
     val elementAsSeq: Parser<SequenceK<B>> = element.map { sequenceOf(it).k() }
@@ -112,8 +117,9 @@ fun <A, B> sepBy(sep: Parser<A>, element: Parser<B>): Parser<List<B>> = ParserAl
 fun jsonArray(): Parser<JsonValue> = ParserAlternativeInstance.run {
     val separator = whiteSpace().followedBy(charParser(',')).apTap(whiteSpace()).fix()
     val elements: Parser<List<JsonValue>> = sepBy(separator, jsonValue())
-    val followedBy: Parser<List<JsonValue>> = charParser('[').followedBy(whiteSpace()).followedBy(elements).fix()
-    val result: Parser<List<JsonValue>> = followedBy.apTap(whiteSpace()).apTap(charParser(']')).fix()
+    val prefix = charParser('[').followedBy(whiteSpace())
+    val suffix = whiteSpace().apTap(charParser(']'))
+    val result: Parser<List<JsonValue>> = prefix.followedBy(elements).apTap(suffix).fix()
     result.map { JsonArray(it) }
 }
 
@@ -122,10 +128,11 @@ fun jsonObject(): Parser<JsonValue> = ParserAlternativeInstance.run {
     val suffix = whiteSpace().followedBy(charParser('}')).fix()
     val objectSeparator = whiteSpace().followedBy(charParser(',')).apTap(whiteSpace()).fix()
     val keyValueSeparator: Parser<Char> = whiteSpace().followedBy(charParser(':')).apTap(whiteSpace()).fix()
-    val combineIntoObject: (String, Char, JsonValue) -> Tuple2<String, JsonValue> = { key, _, value -> key toT value }
+    val combineIntoObject: (StringView, Char, JsonValue) -> Tuple2<String, JsonValue> =
+        { key, _, value -> key.value toT value }
 
     val map: Parser<(Char) -> (JsonValue) -> Tuple2<String, JsonValue>> =
-        stringLiteral().map { s: String -> { c: Char -> { v: JsonValue -> combineIntoObject(s, c, v) } } }
+        stringLiteral().map { s: StringView -> { c: Char -> { v: JsonValue -> combineIntoObject(s, c, v) } } }
 
     val pair: Parser<Tuple2<String, JsonValue>> = jsonValue().ap(keyValueSeparator.ap(map))
 
@@ -139,99 +146,24 @@ fun jsonValue(): Parser<JsonValue> = Parser { input ->
     }.fix().runParser(input)
 }
 
+@ExperimentalTime
 fun main() {
-    println(
-        jsonValue().runParser(
-            """
-            {"web-app": {
-              "servlet": [   
-                {
-                  "servlet-name": "cofaxCDS",
-                  "servlet-class": "org.cofax.cds.CDSServlet",
-                  "init-param": {
-                    "configGlossary:installationAt": "Philadelphia, PA",
-                    "configGlossary:adminEmail": "ksm@pobox.com",
-                    "configGlossary:poweredBy": "Cofax",
-                    "configGlossary:poweredByIcon": "/images/cofax.gif",
-                    "configGlossary:staticPath": "/content/static",
-                    "templateProcessorClass": "org.cofax.WysiwygTemplate",
-                    "templateLoaderClass": "org.cofax.FilesTemplateLoader",
-                    "templatePath": "templates",
-                    "templateOverridePath": "",
-                    "defaultListTemplate": "listTemplate.htm",
-                    "defaultFileTemplate": "articleTemplate.htm",
-                    "useJSP": false,
-                    "jspListTemplate": "listTemplate.jsp",
-                    "jspFileTemplate": "articleTemplate.jsp",
-                    "cachePackageTagsTrack": 200,
-                    "cachePackageTagsStore": 200,
-                    "cachePackageTagsRefresh": 60,
-                    "cacheTemplatesTrack": 100,
-                    "cacheTemplatesStore": 50,
-                    "cacheTemplatesRefresh": 15,
-                    "cachePagesTrack": 200,
-                    "cachePagesStore": 100,
-                    "cachePagesRefresh": 10,
-                    "cachePagesDirtyRead": 10,
-                    "searchEngineListTemplate": "forSearchEnginesList.htm",
-                    "searchEngineFileTemplate": "forSearchEngines.htm",
-                    "searchEngineRobotsDb": "WEB-INF/robots.db",
-                    "useDataStore": true,
-                    "dataStoreClass": "org.cofax.SqlDataStore",
-                    "redirectionClass": "org.cofax.SqlRedirection",
-                    "dataStoreName": "cofax",
-                    "dataStoreDriver": "com.microsoft.jdbc.sqlserver.SQLServerDriver",
-                    "dataStoreUrl": "jdbc:microsoft:sqlserver://LOCALHOST:1433;DatabaseName=goon",
-                    "dataStoreUser": "sa",
-                    "dataStorePassword": "dataStoreTestQuery",
-                    "dataStoreTestQuery": "SET NOCOUNT ON;select test='test';",
-                    "dataStoreLogFile": "/usr/local/tomcat/logs/datastore.log",
-                    "dataStoreInitConns": 10,
-                    "dataStoreMaxConns": 100,
-                    "dataStoreConnUsageLimit": 100,
-                    "dataStoreLogLevel": "debug",
-                    "maxUrlLength": 500}},
-                {
-                  "servlet-name": "cofaxEmail",
-                  "servlet-class": "org.cofax.cds.EmailServlet",
-                  "init-param": {
-                  "mailHost": "mail1",
-                  "mailHostOverride": "mail2"}},
-                {
-                  "servlet-name": "cofaxAdmin",
-                  "servlet-class": "org.cofax.cds.AdminServlet"},
-             
-                {
-                  "servlet-name": "fileServlet",
-                  "servlet-class": "org.cofax.cds.FileServlet"},
-                {
-                  "servlet-name": "cofaxTools",
-                  "servlet-class": "org.cofax.cms.CofaxToolsServlet",
-                  "init-param": {
-                    "templatePath": "toolstemplates/",
-                    "log": 1,
-                    "logLocation": "/usr/local/tomcat/logs/CofaxTools.log",
-                    "logMaxSize": "",
-                    "dataLog": 1,
-                    "dataLogLocation": "/usr/local/tomcat/logs/dataLog.log",
-                    "dataLogMaxSize": "",
-                    "removePageCache": "/content/admin/remove?cache=pages&id=",
-                    "removeTemplateCache": "/content/admin/remove?cache=templates&id=",
-                    "fileTransferFolder": "/usr/local/tomcat/webapps/content/fileTransferFolder",
-                    "lookInContext": 1,
-                    "adminGroupID": 4,
-                    "betaServer": true}}],
-              "servlet-mapping": {
-                "cofaxCDS": "/",
-                "cofaxEmail": "/cofaxutil/aemail/*",
-                "cofaxAdmin": "/admin/*",
-                "fileServlet": "/static/*",
-                "cofaxTools": "/tools/*"},
-             
-              "taglib": {
-                "taglib-uri": "cofax.tld",
-                "taglib-location": "/WEB-INF/tlds/cofax.tld"}}}
-        """.trimIndent()
-        )
-    )
+    val sampleJson = Parser::class.java.getResourceAsStream("/citylots_no_floats_no_negatives.json").readBytes().toString(Charsets.UTF_8)
+    measureParse(""""test"""")
+    measureParse("""1""")
+    measureParse("""false""")
+    measureParse("""null""")
+    measureParse("""[1]""")
+    measureParse("""[1,2,3]""")
+    measureParse("""{"test": [[1,2,[1,2,3]], 1,2,3], "foo": 1, "bar": false, "baz": "value"}""")
+    measureParse(sampleJson)
+}
+
+@ExperimentalTime
+fun measureParse(s: String) {
+    val f: TimedValue<Option<Tuple2<StringView, JsonValue>>> = measureTimedValue {
+        jsonValue().runParser(StringView.from(s))
+    }
+
+    println("Took ${f.duration} to parse ${f.value}")
 }
