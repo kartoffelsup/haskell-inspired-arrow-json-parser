@@ -32,18 +32,18 @@ interface ParserAlternative : Alternative<ForParser> {
 
     override fun <A> just(a: A): Kind<ForParser, A> = Parser.just(a)
 
-    override fun <A> Kind<ForParser, A>.many(): Parser<SequenceK<A>> = Parser { input: String ->
+    override fun <A> Kind<ForParser, A>.many(): Parser<SequenceK<A>> = Parser { input: StringView ->
         val parserA: Parser<A> = this.fix()
-        val runParser: Option<Tuple2<String, A>> = parserA.runParser(input)
+        val runParser: Option<Tuple2<StringView, A>> = parserA.runParser(input)
         runParser.fold(
             ifEmpty = {
-                val tuple2: Tuple2<String, SequenceK<A>> = input toT emptySequence<A>().k()
-                val some: Option<Tuple2<String, SequenceK<A>>> = Some(tuple2)
+                val tuple2: Tuple2<StringView, SequenceK<A>> = input toT emptySequence<A>().k()
+                val some: Option<Tuple2<StringView, SequenceK<A>>> = Some(tuple2)
                 some
             },
-            ifSome = { (r: String, a: A) ->
-                many().runParser(r).fold({ Some(r toT sequenceOf(a).k()) }, { (r2: String, xs: SequenceK<A>) ->
-                    val tuple: Tuple2<String, SequenceK<A>> = r2 toT (sequenceOf(a) + xs).k()
+            ifSome = { (r: StringView, a: A) ->
+                many().runParser(r).fold({ Some(r toT sequenceOf(a).k()) }, { (r2: StringView, xs: SequenceK<A>) ->
+                    val tuple: Tuple2<StringView, SequenceK<A>> = r2 toT (sequenceOf(a) + xs).k()
                     Some(tuple)
                 })
             })

@@ -9,8 +9,8 @@ import arrow.typeclasses.Eq
 
 interface ParserIntEq : Eq<Kind<ForParser, Int>> {
     override fun Kind<ForParser, Int>.eqv(b: Kind<ForParser, Int>): Boolean {
-        return fix().runParser("asdf") == b.fix().runParser("asdf") &&
-                fix().runParser("") == b.fix().runParser("")
+        return fix().runParser(StringView.from("asdf")) == b.fix().runParser(StringView.from("asdf")) &&
+                fix().runParser(StringView.from("")) == b.fix().runParser(StringView.from(""))
     }
 }
 
