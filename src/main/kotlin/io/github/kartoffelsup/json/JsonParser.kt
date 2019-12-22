@@ -2,7 +2,6 @@ package io.github.kartoffelsup.json
 
 import arrow.Kind
 import arrow.core.ForListK
-import arrow.core.NonEmptyList
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.SequenceK
@@ -13,9 +12,8 @@ import arrow.core.extensions.list.traverse.sequence
 import arrow.core.fix
 import arrow.core.k
 import arrow.core.toMap
+import arrow.core.toOption
 import arrow.core.toT
-
-// typealias Parser<T> = (String) -> Option<Tuple2<String, T>>
 
 interface Parser<out A> : ParserOf<A> {
     // TODO: no proper error reporting
@@ -37,25 +35,26 @@ interface Parser<out A> : ParserOf<A> {
     }
 
     companion object {
-        operator fun <T> invoke(parser: (String) -> Option<Tuple2<String, T>>): Parser<T> = object : Parser<T> {
-            override val runParser: (String) -> Option<Tuple2<String, T>> = parser
-        }
+        operator fun <T> invoke(parser: (String) -> Option<Tuple2<String, T>>): Parser<T> = ParserInstance(parser)
 
         fun <A> just(a: A): Parser<A> = Parser { input ->
             Some(Tuple2(input, a))
         }
+
+        private data class ParserInstance<A>(override val runParser: (String) -> Option<Tuple2<String, A>>) : Parser<A>
     }
 }
 
 private fun charParser(char: Char): Parser<Char> =
-    Parser { x: String ->
-        NonEmptyList.fromList(x.toList())
-            .filter { it.head == char }
-            .map { it.tail.s() toT it.head }
+    Parser { input: String ->
+        input
+            .takeIf { it.isNotEmpty() && it[0] == char }
+            .toOption()
+            .map { it.drop(1) toT it[0] }
     }
 
 private fun stringParser(string: String): Parser<String> {
-    val parser: Parser<Kind<ForListK, Char>> = string.toList()
+    val parser: Parser<Kind<ForListK, Char>> = string
         .map(::charParser).k()
         .sequence(ParserApplicativeInstance).fix()
 
@@ -63,8 +62,8 @@ private fun stringParser(string: String): Parser<String> {
 }
 
 private fun spanParser(p: (Char) -> Boolean): Parser<String> = Parser { input ->
-    val (xs, input2) = input.toList().span(p)
-    Some(input2.s() toT xs.s())
+    val (xs, input2) = input.span(p)
+    Some(input2 toT xs)
 }
 
 fun jsonNull(): Parser<JsonValue> =

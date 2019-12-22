@@ -6,7 +6,6 @@ import arrow.core.Option
 import arrow.core.SequenceK
 import arrow.core.Some
 import arrow.core.Tuple2
-import arrow.core.curry
 import arrow.core.k
 import arrow.core.orElse
 import arrow.core.toT
@@ -16,7 +15,6 @@ import arrow.typeclasses.Functor
 
 interface ParserFunctor : Functor<ForParser> {
     override fun <A, B> ParserOf<A>.map(f: (A) -> B) = fix().map(f)
-
 }
 
 interface ParserApplicative : Applicative<ForParser> {

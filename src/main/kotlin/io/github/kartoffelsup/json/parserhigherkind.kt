@@ -1,6 +1,5 @@
 package io.github.kartoffelsup.json
 
-
 class ForParser private constructor() { companion object }
 typealias ParserOf<A> = arrow.Kind<ForParser, A>
 

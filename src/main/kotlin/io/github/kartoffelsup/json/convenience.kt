@@ -2,7 +2,8 @@ package io.github.kartoffelsup.json
 
 import arrow.core.Tuple2
 import arrow.core.toT
+import java.lang.StringBuilder
 
-fun List<Char>.s() = joinToString("")
+fun List<Char>.s(): String = joinTo(StringBuilder(size), "").toString()
 
-fun <T> List<T>.span(p: (T) -> Boolean): Tuple2<List<T>, List<T>> = this.takeWhile(p) toT this.dropWhile(p)
+fun String.span(p: (Char) -> Boolean): Tuple2<String, String> = this.takeWhile(p) toT this.dropWhile(p)
