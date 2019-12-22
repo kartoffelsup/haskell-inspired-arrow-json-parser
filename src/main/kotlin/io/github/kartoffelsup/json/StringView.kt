@@ -35,12 +35,10 @@ data class StringView private constructor(
 
     fun length(): Int = length
 
-    fun drop(num: Int): StringView {
-        return if (length() > num) {
-            StringView(buffer, startIndex + num, endIndex)
-        } else {
-            StringView(buffer, 0, -1)
-        }
+    fun drop(num: Int): StringView = if (length() > num) {
+        StringView(buffer, startIndex + num, endIndex)
+    } else {
+        StringView(buffer, 0, -1)
     }
 
     operator fun get(index: Int): Char = buffer[startIndex + index]
