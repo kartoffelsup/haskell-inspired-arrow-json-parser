@@ -46,9 +46,17 @@ interface Parser<out A> : ParserOf<A> {
         }
 
         private data class ParserInstance<A>(
-            override val runParser: (StringView) -> Option<Tuple2<StringView, A>>) : Parser<A>
+            override val runParser: (StringView) -> Option<Tuple2<StringView, A>>
+        ) : Parser<A>
     }
 }
+
+@Suppress("SameParameterValue")
+private fun maybe(char: Char): Parser<Option<Char>> =
+    ParserAlternativeInstance.run {
+        val maybeParser: Kind<ForParser, String> = stringParser(char.toString()) alt just("")
+        maybeParser.map { it.firstOrNull().toOption() }
+    }.fix()
 
 private fun charParser(char: Char): Parser<Char> =
     Parser { input: StringView ->
@@ -89,7 +97,19 @@ fun notEmpty(p: Parser<StringView>): Parser<StringView> = Parser { input ->
     }
 }
 
-fun jsonNumber(): Parser<JsonValue> = notEmpty(spanParser(Char::isDigit)).map { JsonNumber(it.value.toInt()) }
+fun jsonNumber(): Parser<JsonValue> {
+    val maybeMinusCombineWithDigits: Parser<(StringView) -> String> = maybe('-')
+        .map { maybeMinus: Option<Char> ->
+            { digits: StringView ->
+                maybeMinus.fold(
+                    ifEmpty = { digits.value },
+                    ifSome = { minus -> minus + digits.value }
+                )
+            }
+        }
+
+    return notEmpty(spanParser(Char::isDigit)).ap(maybeMinusCombineWithDigits).map { JsonNumber(it.toInt()) }
+}
 
 // TODO: no escape support
 fun stringLiteral(): Parser<StringView> = ParserAlternativeInstance.run {
@@ -140,7 +160,7 @@ fun jsonObject(): Parser<JsonValue> = ParserAlternativeInstance.run {
         .map { JsonObject(it.toMap()) }
 }
 
-fun jsonValue(): Parser<JsonValue> = Parser { input ->
+fun jsonValue(): Parser<JsonValue> = Parser { input: StringView ->
     ParserAlternativeInstance.run {
         jsonNull() alt jsonBool() alt jsonNumber() alt jsonString() alt jsonArray() alt jsonObject()
     }.fix().runParser(input)
@@ -148,15 +168,19 @@ fun jsonValue(): Parser<JsonValue> = Parser { input ->
 
 @ExperimentalTime
 fun main() {
-    val sampleJson = Parser::class.java.getResourceAsStream("/citylots_no_floats_no_negatives.json").readBytes().toString(Charsets.UTF_8)
+    val sampleJson = Parser::class.java.getResourceAsStream("/sample.json").readBytes().toString(Charsets.UTF_8)
+    val _180mbJson = Parser::class.java.getResourceAsStream("/citylots_no_floats_no_negatives.json").readBytes()
+        .toString(Charsets.UTF_8)
     measureParse(""""test"""")
     measureParse("""1""")
+    measureParse("""-1""")
     measureParse("""false""")
     measureParse("""null""")
     measureParse("""[1]""")
     measureParse("""[1,2,3]""")
     measureParse("""{"test": [[1,2,[1,2,3]], 1,2,3], "foo": 1, "bar": false, "baz": "value"}""")
     measureParse(sampleJson)
+    measureParse(_180mbJson)
 }
 
 @ExperimentalTime
