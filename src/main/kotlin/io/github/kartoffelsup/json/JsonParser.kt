@@ -51,14 +51,13 @@ interface Parser<out A> : ParserOf<A> {
     }
 }
 
-@Suppress("SameParameterValue")
-private fun maybe(char: Char): Parser<Option<Char>> =
+internal fun maybe(char: Char): Parser<Option<Char>> =
     ParserAlternativeInstance.run {
         val maybeParser: Kind<ForParser, String> = stringParser(char.toString()) alt just("")
         maybeParser.map { it.firstOrNull().toOption() }
     }.fix()
 
-private fun charParser(char: Char): Parser<Char> =
+internal fun charParser(char: Char): Parser<Char> =
     Parser { input: StringView ->
         input
             .takeIf { it.isNotEmpty() && it[0] == char }
@@ -66,7 +65,7 @@ private fun charParser(char: Char): Parser<Char> =
             .map { it.drop(1) toT it[0] }
     }
 
-private fun stringParser(string: String): Parser<String> {
+internal fun stringParser(string: String): Parser<String> {
     val parser: Parser<Kind<ForListK, Char>> = string
         .map(::charParser).k()
         .sequence(ParserApplicativeInstance).fix()
@@ -74,7 +73,7 @@ private fun stringParser(string: String): Parser<String> {
     return parser.map { it.fix().s() }
 }
 
-private fun spanParser(p: (Char) -> Boolean): Parser<StringView> = Parser { input ->
+internal fun spanParser(p: (Char) -> Boolean): Parser<StringView> = Parser { input ->
     val (xs, input2) = input.span(p)
     Some(input2 toT xs)
 }
@@ -130,8 +129,8 @@ fun <A, B> sepBy(sep: Parser<A>, element: Parser<B>): Parser<List<B>> = ParserAl
         elementAsSeq.map { a: SequenceK<B> -> { b: SequenceK<B> -> (a + b).k() } }
 
     val result: Parser<SequenceK<B>> = rw.ap(cons).fix()
-    val just: Parser<SequenceK<B>> = just(emptySequence<B>().k()).fix()
-    (result alt just).map { it.toList() }.fix()
+    val emptySequence: Parser<SequenceK<B>> = just(emptySequence<B>().k()).fix()
+    (result alt emptySequence).map { it.toList() }.fix()
 }
 
 fun jsonArray(): Parser<JsonValue> = ParserAlternativeInstance.run {
@@ -169,17 +168,14 @@ fun jsonValue(): Parser<JsonValue> = Parser { input: StringView ->
 @ExperimentalTime
 fun main() {
     val sampleJson = Parser::class.java.getResourceAsStream("/sample.json").readBytes().toString(Charsets.UTF_8)
+    val tsodingScheduleJson =
+        Parser::class.java.getResourceAsStream("/tsoding_schedule.json").readBytes().toString(Charsets.UTF_8)
     val _180mbJson = Parser::class.java.getResourceAsStream("/citylots_no_floats_no_negatives.json").readBytes()
         .toString(Charsets.UTF_8)
-    measureParse(""""test"""")
-    measureParse("""1""")
-    measureParse("""-1""")
-    measureParse("""false""")
-    measureParse("""null""")
-    measureParse("""[1]""")
-    measureParse("""[1,2,3]""")
-    measureParse("""{"test": [[1,2,[1,2,3]], 1,2,3], "foo": 1, "bar": false, "baz": "value"}""")
+    measureParse("""{"test": [[-1,[2],[1,2,3]], 1,2,3], "foo": 1, "bar": false, "baz": "value"}""")
+    jsonNumber().runParser(StringView.from("1-1"))
     measureParse(sampleJson)
+    measureParse(tsodingScheduleJson)
     measureParse(_180mbJson)
 }
 
@@ -189,5 +185,5 @@ fun measureParse(s: String) {
         jsonValue().runParser(StringView.from(s))
     }
 
-    println("Took ${f.duration} to parse ${f.value}")
+    println("Took ${f.duration} to parse ${f.value.map { it.b }}")
 }

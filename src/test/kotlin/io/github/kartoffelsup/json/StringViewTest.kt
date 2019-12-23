@@ -2,6 +2,7 @@ package io.github.kartoffelsup.json
 
 import arrow.core.Tuple2
 import arrow.test.generators.char
+import arrow.test.generators.greaterEqual
 import io.kotlintest.properties.Gen
 import io.kotlintest.properties.assertAll
 import io.kotlintest.shouldBe
@@ -54,9 +55,14 @@ internal class StringViewTest : StringSpec({
     }
 
     "Gen nested span non empty" {
-        assertAll(Gen.string(), CharPredicateGen) { a: String, p: CharPredicateWrapper ->
-            val actual: Tuple2<StringView, StringView> = StringView.from(a).span(p.predicate).flatMap { it.span(p.predicate) }
-            val expected: Tuple2<String, String> = a.span(p.predicate).flatMap { it.span(p.predicate) }
+        assertAll(
+            Gen.string(),
+            CharPredicateGen,
+            CharPredicateGen
+        ) { input: String, first: CharPredicateWrapper, second: CharPredicateWrapper ->
+            val actual: Tuple2<StringView, StringView> =
+                StringView.from(input).span(first.predicate).flatMap { it.span(second.predicate) }
+            val expected: Tuple2<String, String> = input.span(first.predicate).flatMap { it.span(second.predicate) }
             actual.a.value shouldBe expected.a
             actual.b.value shouldBe expected.b
         }
@@ -89,25 +95,9 @@ internal class StringViewTest : StringSpec({
     }
 
     "drop" {
-        assertAll { a: String, b: Int ->
-            if (b >= 0) {
-                StringView.from(a).drop(b).value shouldBe a.drop(b)
-                StringView.from(a).drop(b).drop(b).value shouldBe a.drop(b).drop(b)
-            }
-        }
-    }
-
-    "drop 0" {
-        assertAll { a: String ->
-            StringView.from(a).drop(0).value shouldBe a.drop(0)
-        }
-    }
-
-    "drop n > a.length" {
-        assertAll { a: String ->
-            val n: Int = a.length
-            StringView.from(a).drop(n).value shouldBe a.drop(n)
-            StringView.from(a).drop(n + 1).value shouldBe a.drop(n + 1)
+        assertAll(Gen.string(), Gen.greaterEqual(0)) { a: String, b: Int ->
+            StringView.from(a).drop(b).value shouldBe a.drop(b)
+            StringView.from(a).drop(b).drop(b).value shouldBe a.drop(b).drop(b)
         }
     }
 
