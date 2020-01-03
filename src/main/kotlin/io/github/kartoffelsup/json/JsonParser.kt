@@ -1,7 +1,7 @@
 package io.github.kartoffelsup.json
 
 import arrow.Kind
-import arrow.core.AndThen
+import arrow.core.Eval
 import arrow.core.ListK
 import arrow.core.SequenceK
 import arrow.core.Tuple2
@@ -14,34 +14,34 @@ import kotlin.time.measureTimedValue
 
 interface Parser<A> : ParserOf<A> {
     // TODO: no proper error reporting
-    val runParser: AndThen<StringView, Tuple2<StringView, A>?>
+    val runParser: (StringView) -> Eval<Tuple2<StringView, A>?>
 
-    fun <B> map(f: (A) -> B): Parser<B> = Parser(
-        runParser.map { it?.map { t -> f(t) } }
-    )
+    fun <B> map(f: (A) -> B): Parser<B> = Parser { input ->
+        runParser(input).map { tuple2 -> tuple2?.map(f) }
+    }
 
     fun <B> ap(ff: ParserOf<(A) -> B>): Parser<B> = lazyAp { ff }
 
-    fun <B> lazyAp(ff: () -> ParserOf<(A) -> B>): Parser<B> = Parser(
-        fix().runParser.map { op: Tuple2<StringView, A>? ->
-            op?.let { (input: StringView, a: A) ->
-                ff().fix().runParser(input)?.let { (out: StringView, f: (A) -> B) ->
-                    out toT f(a)
+    fun <B> lazyAp(ff: () -> ParserOf<(A) -> B>): Parser<B> = Parser { input ->
+        fix().runParser(input).flatMap { op: Tuple2<StringView, A>? ->
+            if (op == null) {
+                Eval.just(null)
+            } else {
+                ff().fix().runParser(op.a).map { t ->
+                    t?.map { it(op.b) }
                 }
             }
-        })
+        }
+    }
 
     companion object {
-        operator fun <A> invoke(parser: (StringView) -> Tuple2<StringView, A>?): Parser<A> =
-            ParserInstance(AndThen(parser))
-
-        operator fun <A> invoke(parser: AndThen<StringView, Tuple2<StringView, A>?>): Parser<A> =
+        operator fun <A> invoke(parser: (StringView) -> Eval<Tuple2<StringView, A>?>): Parser<A> =
             ParserInstance(parser)
 
-        fun <A> just(a: A): Parser<A> = Parser { input: StringView -> Tuple2(input, a) }
+        fun <A> just(a: A): Parser<A> = Parser { input: StringView -> Eval.just(Tuple2(input, a)) }
 
         private data class ParserInstance<A>(
-            override val runParser: AndThen<StringView, Tuple2<StringView, A>?>
+            override val runParser: (StringView) -> Eval<Tuple2<StringView, A>?>
         ) : Parser<A>
     }
 }
@@ -53,11 +53,13 @@ internal fun maybe(char: Char): Parser<Char?> =
     }.fix()
 
 internal fun charParser(char: Char): Parser<Char> =
-    Parser(AndThen { input: StringView ->
-        input
-            .takeIf { it.isNotEmpty() && it[0] == char }
-            ?.let { it.drop(1) toT it[0] }
-    })
+    Parser { input: StringView ->
+        Eval.later {
+            input
+                .takeIf { it.isNotEmpty() && it[0] == char }
+                ?.let { it.drop(1) toT it[0] }
+        }
+    }
 
 internal fun stringParser(toParse: String): Parser<String> {
     val parser: Parser<ListK<Char>> = toParse
@@ -68,10 +70,12 @@ internal fun stringParser(toParse: String): Parser<String> {
 }
 
 internal fun spanParser(p: (Char) -> Boolean): Parser<StringView> =
-    Parser(AndThen { input ->
-        val (xs, input2) = input.span(p)
-        input2 toT xs
-    })
+    Parser { input ->
+        Eval.later {
+            val (xs, input2) = input.span(p)
+            input2 toT xs
+        }
+    }
 
 val jsonNull: Parser<JsonValue> =
     ParserFunctorInstance.run {
@@ -86,11 +90,11 @@ val jsonBool: Parser<JsonValue> =
     }
 
 fun notEmpty(p: Parser<StringView>): Parser<StringView> =
-    Parser(
-        p.runParser.andThen { option: Tuple2<StringView, StringView>? ->
+    Parser { input ->
+        p.runParser(input).map { option: Tuple2<StringView, StringView>? ->
             option?.takeIf { it.b.isNotEmpty() }
         }
-    )
+    }
 
 val jsonNumber: Parser<JsonValue> = maybe('-').ap(notEmpty(spanParser(Char::isDigit))
     .map { digits: StringView ->
@@ -161,13 +165,13 @@ fun jsonValue(): Parser<JsonValue> =
 
 @ExperimentalTime
 fun main() {
-    val sampleJson = loadResource("/sample.json")
-    val tsodingScheduleJson = loadResource("/tsoding_schedule.json")
+//    val sampleJson = loadResource("/sample.json")
+//    val tsodingScheduleJson = loadResource("/tsoding_schedule.json")
     val githubGists = loadResource("/github_gists.json")
-//    val _180mbJson = loadResource("/citylots_no_floats_no_negatives.json")
-    measureParse("""{"test": [[-1,[2],[[4,3,[9,8,7], 2], 1,2,3]], 1,2,3], "foo": 1, "bar": false, "baz": "value"}""")
-    measureParse(sampleJson)
-    measureParse(tsodingScheduleJson)
+//    val _180mbJson = loadResource("/citylots_no_floats.json")
+//    measureParse("""{"test": [[-1,[2],[[4,3,[9,8,7], 2], 1,2,3]], 1,2,3], "foo": 1, "bar": false, "baz": "value"}""")
+//    measureParse(sampleJson)
+//    measureParse(tsodingScheduleJson)
     measureParse(githubGists)
 //    measureParse(_180mbJson)
 }
@@ -177,8 +181,8 @@ fun loadResource(name: String) = Parser::class.java.getResourceAsStream(name).re
 @ExperimentalTime
 fun measureParse(s: String) {
     val f: TimedValue<Tuple2<StringView, JsonValue>?> = measureTimedValue {
-        jsonValue().runParser(StringView.from(s))
+        jsonValue().runParser(StringView.from(s)).value()
     }
 
-    println("Took ${f.duration} to parse ${f.value?.b}")
+    println("Took ${f.duration} to parse ${s.length} characters roughly ${(s.length + 2) / 1024 / 1024}mb")
 }

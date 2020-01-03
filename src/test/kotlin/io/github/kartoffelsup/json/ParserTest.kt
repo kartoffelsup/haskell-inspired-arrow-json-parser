@@ -14,7 +14,7 @@ class ParserTest : StringSpec({
     "charParser" {
         assertAll(Gen.nonEmptyString()) { str: String ->
             val first: Char = str.first()
-            val parsedChar: Tuple2<StringView, Char>? = charParser(first).runParser(StringView.from(str))
+            val parsedChar: Tuple2<StringView, Char>? = charParser(first).runParser(StringView.from(str)).value()
             parsedChar?.b shouldBe first
         }
     }
@@ -24,10 +24,10 @@ class ParserTest : StringSpec({
             val first: Char = str.first()
             val second: Char? = str.drop(1).firstOrNull()
             val stringView = StringView.from(str)
-            val someMaybe: Tuple2<StringView, Char?>? = maybe(first).runParser(stringView)
+            val someMaybe: Tuple2<StringView, Char?>? = maybe(first).runParser(stringView).value()
             someMaybe?.b shouldBe first
             if (second != null && first != second) {
-                val noneMaybe = maybe(second).runParser(stringView)
+                val noneMaybe = maybe(second).runParser(stringView).value()
                 noneMaybe?.b shouldBe null
             }
         }
@@ -36,7 +36,7 @@ class ParserTest : StringSpec({
     "spanParser" {
         assertAll(Gen.string(), CharPredicateGen) { str: String, predWrapper: CharPredicateWrapper ->
             val parsedString: Tuple2<StringView, StringView>? =
-                spanParser(predWrapper.predicate).runParser(StringView.from(str))
+                spanParser(predWrapper.predicate).runParser(StringView.from(str)).value()
             val expected: Tuple2<String, String> = str.span(predWrapper.predicate).reverse()
             parsedString?.let { it.a.value toT it.b.value } shouldBe expected
         }
@@ -44,25 +44,25 @@ class ParserTest : StringSpec({
 
     "stringParser" {
         assertAll { str: String ->
-            val parsedString: Tuple2<StringView, String>? = stringParser(str).runParser(StringView.from(str))
+            val parsedString: Tuple2<StringView, String>? = stringParser(str).runParser(StringView.from(str)).value()
             parsedString?.b shouldBe str
         }
     }
 
     "jsonNull" {
-        val jsonNull = jsonNull.runParser(StringView.from("null"))
+        val jsonNull = jsonNull.runParser(StringView.from("null")).value()
         jsonNull?.b shouldBe JsonNull
     }
 
     "whitespace" {
-        val jsonNull = whiteSpace.runParser(StringView.from(" \n \r\n \r \t"))
+        val jsonNull = whiteSpace.runParser(StringView.from(" \n \r\n \r \t")).value()
         jsonNull?.let { it.a.value toT it.b.value } shouldBe Tuple2("", " \n \r\n \r \t")
     }
 
     "jsonBool" {
-        val boolTrue = jsonBool.runParser(StringView.from("true"))
-        val boolFalse = jsonBool.runParser(StringView.from("false"))
-        val notABool = jsonBool.runParser(StringView.from("notABool"))
+        val boolTrue = jsonBool.runParser(StringView.from("true")).value()
+        val boolFalse = jsonBool.runParser(StringView.from("false")).value()
+        val notABool = jsonBool.runParser(StringView.from("notABool")).value()
         boolTrue?.b shouldBe JsonBool(true)
         boolFalse?.b shouldBe JsonBool(false)
         notABool?.b shouldBe null
@@ -71,7 +71,7 @@ class ParserTest : StringSpec({
     "notEmpty" {
         assertAll { input: String ->
             val inputView = StringView.from(input)
-            val notEmpty: Tuple2<StringView, StringView>? = notEmpty(spanParser { true }).runParser(inputView)
+            val notEmpty: Tuple2<StringView, StringView>? = notEmpty(spanParser { true }).runParser(inputView).value()
             val actual: StringView? = notEmpty?.b
             val expected = if (input.isEmpty()) null else inputView
             actual shouldBe expected
@@ -80,7 +80,7 @@ class ParserTest : StringSpec({
 
     "jsonNumber" {
         assertAll { number: Int ->
-            val jsonValue: Tuple2<StringView, JsonValue>? = jsonNumber.runParser(StringView.from(number.toString()))
+            val jsonValue: Tuple2<StringView, JsonValue>? = jsonNumber.runParser(StringView.from(number.toString())).value()
             jsonValue?.b shouldBe JsonNumber(number)
         }
     }

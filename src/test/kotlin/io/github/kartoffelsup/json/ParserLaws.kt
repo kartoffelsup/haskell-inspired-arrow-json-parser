@@ -1,5 +1,6 @@
 package io.github.kartoffelsup.json
 
+import arrow.core.Eval
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Tuple2
@@ -15,8 +16,8 @@ import io.kotlintest.properties.Gen
 
 object ParserEqK : EqK<ForParser> {
     override fun <A> ParserOf<A>.eqK(other: ParserOf<A>, EQ: Eq<A>): Boolean {
-        val first: Tuple2<StringView, A>? = fix().runParser(StringView.from(""))
-        val second: Tuple2<StringView, A>? = other.fix().runParser(StringView.from(""))
+        val first: Tuple2<StringView, A>? = fix().runParser(StringView.from("")).value()
+        val second: Tuple2<StringView, A>? = other.fix().runParser(StringView.from("")).value()
         return Option.eqK().run {
             first == second
         }
@@ -27,7 +28,7 @@ class ParserLawsTest : UnitSpec() {
     init {
         val genK = object : GenK<ForParser> {
             override fun <A> genK(gen: Gen<A>): Gen<ParserOf<A>> {
-                return gen.orNull().map { a -> a?.let { Parser.just(it) } ?: Parser { null } }
+                return gen.orNull().map { a -> a?.let { Parser.just(it) } ?: Parser { Eval.just(null) } }
             }
         }
         testLaws(
