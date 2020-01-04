@@ -8,7 +8,7 @@ import io.kotlintest.properties.assertAll
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 
-class CharPredicateWrapper(val predicate: (Char) -> Boolean, val description: String) {
+class CharPredicateWrapper(val predicate: (Char) -> Boolean, private val description: String) {
     override fun toString(): String = description
 }
 
@@ -23,7 +23,7 @@ object CharPredicateGen : Gen<CharPredicateWrapper> {
             CharPredicateWrapper(Char::isLowerCase, "Char::isLowerCase"),
             CharPredicateWrapper({ a: Char -> a == 'a' }, "{ a: Char -> a == 'a' }"),
             CharPredicateWrapper({ a: Char -> a == 'b' }, "{ a: Char -> a == 'b' }"),
-            CharPredicateWrapper({ a: Char -> a == 'c' }, "{ a: Char -> a == 'c'}")
+            CharPredicateWrapper({ a: Char -> a == 'c' }, "{ a: Char -> a == 'c' }")
         )
     }
 

@@ -6,10 +6,16 @@ plugins {
 repositories {
     mavenLocal()
     mavenCentral()
+    maven {
+        url = uri("https://oss.jfrog.org/artifactory/oss-snapshot-local/")
+        content {
+            includeGroup("io.arrow-kt")
+        }
+    }
 }
 
 dependencies {
-    val arrowVersion = "0.10.4"
+    val arrowVersion = "0.10.5-SNAPSHOT"
     implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("io.arrow-kt:arrow-core:$arrowVersion")

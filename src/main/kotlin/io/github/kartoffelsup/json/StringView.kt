@@ -43,7 +43,7 @@ data class StringView private constructor(
 
     operator fun get(index: Int): Char = buffer[startIndex + index]
 
-    val value: String by lazy { if (isEmpty()) "" else buffer.substring(startIndex..endIndex) }
+    val value: String by lazy { if (isEmpty()) "" else buffer.substring(startIndex, endIndex + 1) }
 
     companion object {
         fun from(s: String) = StringView(s, 0, s.length - 1)
