@@ -184,5 +184,5 @@ fun measureParse(s: String) {
         jsonValue().runParser(StringView.from(s)).value()
     }
 
-    println("Took ${f.duration} to parse ${s.length} characters roughly ${(s.length + 2) / 1024 / 1024}mb")
+    println("Took ${f.duration} to parse ${s.length} characters.")
 }
