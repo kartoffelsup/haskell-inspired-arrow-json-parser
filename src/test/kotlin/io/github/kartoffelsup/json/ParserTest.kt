@@ -1,10 +1,7 @@
 package io.github.kartoffelsup.json
 
-import arrow.core.None
-import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.core.toT
-import arrow.test.generators.nonEmptyString
 import io.kotlintest.properties.Gen
 import io.kotlintest.properties.assertAll
 import io.kotlintest.shouldBe
@@ -12,7 +9,7 @@ import io.kotlintest.specs.StringSpec
 
 class ParserTest : StringSpec({
     "charParser" {
-        assertAll(Gen.nonEmptyString()) { str: String ->
+        assertAll(Gen.string().filter { it.isNotEmpty() }) { str: String ->
             val first: Char = str.first()
             val parsedChar: Tuple2<StringView, Char>? = charParser(first).runParser(StringView.from(str)).value()
             parsedChar?.b shouldBe first
@@ -20,7 +17,7 @@ class ParserTest : StringSpec({
     }
 
     "maybe" {
-        assertAll(Gen.nonEmptyString()) { str: String ->
+        assertAll(Gen.string().filter { it.isNotEmpty() }) { str: String ->
             val first: Char = str.first()
             val second: Char? = str.drop(1).firstOrNull()
             val stringView = StringView.from(str)

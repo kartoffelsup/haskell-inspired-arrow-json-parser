@@ -1,15 +1,14 @@
 package io.github.kartoffelsup.json
 
 import arrow.core.Eval
-import arrow.core.None
 import arrow.core.Option
 import arrow.core.Tuple2
 import arrow.core.extensions.option.eqK.eqK
-import arrow.test.UnitSpec
-import arrow.test.generators.GenK
-import arrow.test.laws.AlternativeLaws
-import arrow.test.laws.ApplicativeLaws
-import arrow.test.laws.FunctorLaws
+import arrow.core.test.UnitSpec
+import arrow.core.test.generators.GenK
+import arrow.core.test.laws.AlternativeLaws
+import arrow.core.test.laws.ApplicativeLaws
+import arrow.core.test.laws.FunctorLaws
 import arrow.typeclasses.Eq
 import arrow.typeclasses.EqK
 import io.kotlintest.properties.Gen
@@ -28,7 +27,7 @@ class ParserLawsTest : UnitSpec() {
     init {
         val genK = object : GenK<ForParser> {
             override fun <A> genK(gen: Gen<A>): Gen<ParserOf<A>> {
-                return gen.orNull().map { a -> a?.let { Parser.just(it) } ?: Parser { Eval.just(null) } }
+                return gen.orNull().map { a: A? -> a?.let { it: A -> Parser.just(it) } ?: Parser { Eval.just(null) } }
             }
         }
         testLaws(

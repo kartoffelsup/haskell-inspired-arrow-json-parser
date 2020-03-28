@@ -22,7 +22,7 @@ dependencies {
     implementation("io.arrow-kt:arrow-syntax:$arrowVersion")
     implementation("io.arrow-kt:arrow-fx:$arrowVersion")
 
-    testImplementation("io.arrow-kt:arrow-test:$arrowVersion")
+    testImplementation("io.arrow-kt:arrow-core-test:$arrowVersion")
 }
 
 tasks {

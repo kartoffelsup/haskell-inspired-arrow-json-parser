@@ -1,8 +1,7 @@
 package io.github.kartoffelsup.json
 
 import arrow.core.Tuple2
-import arrow.test.generators.char
-import arrow.test.generators.greaterEqual
+import arrow.core.test.generators.char
 import io.kotlintest.properties.Gen
 import io.kotlintest.properties.assertAll
 import io.kotlintest.shouldBe
@@ -95,7 +94,7 @@ internal class StringViewTest : StringSpec({
     }
 
     "drop" {
-        assertAll(Gen.string(), Gen.greaterEqual(0)) { a: String, b: Int ->
+        assertAll(Gen.string(), Gen.positiveIntegers()) { a: String, b: Int ->
             StringView.from(a).drop(b).value shouldBe a.drop(b)
             StringView.from(a).drop(b).drop(b).value shouldBe a.drop(b).drop(b)
         }
