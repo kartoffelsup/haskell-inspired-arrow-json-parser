@@ -7,7 +7,7 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven {
-        url = uri("https://oss.jfrog.org/artifactory/oss-snapshot-local/")
+        url = uri("https://dl.bintray.com/arrow-kt/arrow-kt/")
         content {
             includeGroup("io.arrow-kt")
         }
@@ -15,7 +15,7 @@ repositories {
 }
 
 dependencies {
-    val arrowVersion = "0.10.5-SNAPSHOT"
+    val arrowVersion = "0.10.5"
     implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("io.arrow-kt:arrow-core:$arrowVersion")
